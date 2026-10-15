@@ -1,4 +1,7 @@
-doc
+/doc/*
+!/doc/PnPInventory_Setup_Guide.md
+!/doc/System_Architecture_and_Interfaces.pdf
+!/doc/system_architecture_interfaces/
 bin
 target
 

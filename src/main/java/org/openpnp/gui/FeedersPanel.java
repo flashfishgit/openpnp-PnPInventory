@@ -296,6 +296,13 @@ public class FeedersPanel extends JPanel implements WizardContainer {
                     priorRowIndex = table.getSelectedRow();
 
                     Feeder feeder = getSelection();
+                    boolean inventorySlot = feeder instanceof org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder;
+                    feedFeederAction.putValue(Action.SHORT_DESCRIPTION, inventorySlot
+                            ? "Test feed: advances this slot and consumes inventory without a job allocation."
+                            : Translations.getString("FeedersPanel.Action.FeedFeeder.Description"));
+                    pickFeederAction.putValue(Action.SHORT_DESCRIPTION, inventorySlot
+                            ? "Test pick: uses this slot's feed order without a job allocation."
+                            : Translations.getString("FeedersPanel.Action.PickFeeder.Description"));
 
                     for (Component comp : configurationPanel.getComponents()) {
                         if (comp instanceof AbstractConfigurationWizard) {
@@ -619,7 +626,7 @@ public class FeedersPanel extends JPanel implements WizardContainer {
             UiUtils.submitUiMachineTask(() -> {
                 Feeder feeder = getSelection();
                 // Do the feed and get the nozzle that would be used for the subsequent pick. 
-                Nozzle nozzle = feedFeeder(feeder);
+                Nozzle nozzle = feedFeeder(feeder, false);
             });
         }
     };
@@ -649,6 +656,10 @@ public class FeedersPanel extends JPanel implements WizardContainer {
      * @throws Exception
      */
     public static Nozzle feedFeeder(Feeder feeder) throws Exception {
+        return feedFeeder(feeder, false);
+    }
+
+    private static Nozzle feedFeeder(Feeder feeder, boolean forPick) throws Exception {
         if (feeder.getPart() == null) {
             throw new Exception("Feeder "+feeder.getName()+" has no part.");
         }
@@ -673,7 +684,12 @@ public class FeedersPanel extends JPanel implements WizardContainer {
         // Perform the feed.
         nozzle.moveToSafeZ();
         Configuration.get().getScripting().on("Feeder.BeforeFeed", globals);
-        feeder.feed(nozzle);
+        if (!forPick && feeder instanceof org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder) {
+            ((org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder) feeder).feedForTest(nozzle);
+        }
+        else {
+            feeder.feed(nozzle);
+        }
         Configuration.get().getScripting().on("Feeder.AfterFeed", globals);
         return nozzle;
     }
@@ -687,7 +703,7 @@ public class FeedersPanel extends JPanel implements WizardContainer {
      */
     public static void pickFeeder(Feeder feeder) throws Exception, JobProcessorException {
         // Do the feed an get the nozzle for the pick.
-        Nozzle nozzle = feedFeeder(feeder);
+        Nozzle nozzle = feedFeeder(feeder, true);
 
         // Perform the vacuum check, if enabled.
         if (nozzle.isPartOffEnabled(Nozzle.PartOffStep.BeforePick)) {

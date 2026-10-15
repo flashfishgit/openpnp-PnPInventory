@@ -378,6 +378,35 @@ public class ReferenceJobProcessorRetryTests {
         assertEquals(10, f1.feedCount); // each placement is attempted 5 times. There are 2 placements, so 10 feeds total.
     }
 
+    @Test
+    public void inventoryPreflightReportsAllParticipatingFailuresBeforeFeeding() throws Exception {
+        Configuration.initialize();
+        Machine machine = new MachineBuilder().head("H1").nozzleTip("NT1").nozzle("N1", "NT1")
+                .topCamera("TOP").bottomCamera("BOTTOM").build();
+        Job job = new JobBuilder().board("B1", 10, 10, 10, -10).packag("R0402", "NT1")
+                .part("R0402-1k", "R0402").feeder("F1", "R0402-1k", 100, 20, -5, 0)
+                .placement("R1", "R0402-1k", 10, 10, 0).build();
+        TestFeeder existing = (TestFeeder) machine.getFeederByName("F1");
+        for (String name : new String[] {"Inventory A", "Inventory B"}) {
+            org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder feeder =
+                    new org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder() {
+                @Override public void preflight(Job actual) throws Exception {
+                    throw new java.io.IOException("Resolve assignment");
+                }
+            };
+            feeder.setName(name);
+            feeder.setPart(existing.getPart());
+            feeder.setEnabled(true);
+            machine.addFeeder(feeder);
+        }
+        PnpJobProcessor processor = machine.getPnpJobProcessor();
+        processor.initialize(job);
+        Exception failure = org.junit.jupiter.api.Assertions.assertThrows(Exception.class, processor::next);
+        assertTrue(failure.getMessage().contains("Inventory A"));
+        assertTrue(failure.getMessage().contains("Inventory B"));
+        assertEquals(0, existing.feedCount);
+    }
+
     static void runJob(Machine machine, Job job) throws Exception {
         machine.setEnabled(true);
         machine.home();

@@ -39,6 +39,9 @@ import org.openpnp.machine.neoden4.Neoden4Feeder;
 import org.openpnp.machine.neoden4.Neoden4Signaler;
 import org.openpnp.machine.neoden4.Neoden4SwitcherCamera;
 import org.openpnp.machine.pandaplacer.BambooFeederAutoVision;
+import org.openpnp.machine.pnpinventory.PnpInventoryFeederAutoVision;
+import org.openpnp.machine.pnpinventory.PnpInventoryActuator;
+import org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder;
 import org.openpnp.machine.photon.PhotonFeeder;
 import org.openpnp.machine.rapidplacer.RapidFeeder;
 import org.openpnp.machine.reference.ReferenceCameraBatchOperation;
@@ -452,6 +455,8 @@ public class ReferenceMachine extends AbstractMachine {
         l.add(Neoden4Feeder.class);
         l.add(PhotonFeeder.class);
         l.add(BambooFeederAutoVision.class);
+        l.add(PnpInventoryFeederAutoVision.class);
+        l.add(PnpInventorySlotFeeder.class);
         l.addAll(registeredFeederClasses);
         return l;
     }
@@ -486,6 +491,7 @@ public class ReferenceMachine extends AbstractMachine {
         List<Class<? extends Actuator>> l = new ArrayList<>();
         l.add(ReferenceActuator.class);
         l.add(HttpActuator.class);
+        l.add(PnpInventoryActuator.class);
         l.add(ScriptActuator.class);
         l.add(ThermistorToLinearSensorActuator.class);
         l.add(NeoDen4FeederActuator.class);

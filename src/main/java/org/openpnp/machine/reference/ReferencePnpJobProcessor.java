@@ -35,6 +35,7 @@ import javax.swing.SwingUtilities;
 import org.openpnp.Translations;
 import org.openpnp.gui.JobPanel;
 import org.openpnp.gui.MainFrame;
+import org.openpnp.machine.pnpinventory.PnpInventorySlotFeeder;
 import org.openpnp.gui.support.Wizard;
 import org.openpnp.machine.reference.vision.AbstractPartAlignment;
 import org.openpnp.machine.reference.wizards.ReferencePnpJobProcessorConfigurationWizard;
@@ -184,6 +185,15 @@ public class ReferencePnpJobProcessor extends AbstractPnpJobProcessor {
             throw new Exception("Can't initialize with a null Job.");
         }
         this.job = job;
+        for (Feeder feeder : Configuration.get().getMachine().getFeeders()) {
+            if (feeder instanceof PnpInventorySlotFeeder) {
+                org.openpnp.machine.pnpinventory.PnpInventoryActuator actuator =
+                        ((PnpInventorySlotFeeder) feeder).getInventoryActuator();
+                if (actuator != null) {
+                    actuator.resetJobContext();
+                }
+            }
+        }
         currentStep = new PreFlight();
         this.fireJobState(Configuration.get().getMachine().getSignalers(), AbstractJobProcessor.State.STOPPED);
     }
@@ -279,6 +289,7 @@ public class ReferencePnpJobProcessor extends AbstractPnpJobProcessor {
             previousPlacePlanStartLocation = previousPickPlanStartLocation = new Location(LengthUnit.Millimeters);
             
             checkSetupErrors();
+            checkInventoryFeeders();
             
             prepMachine();
             
@@ -291,6 +302,26 @@ public class ReferencePnpJobProcessor extends AbstractPnpJobProcessor {
             return new FiducialCheck();
         }
         
+        private void checkInventoryFeeders() throws JobProcessorException {
+            List<String> failures = new ArrayList<>();
+            for (Feeder feeder : machine.getFeeders()) {
+                if (!(feeder instanceof PnpInventorySlotFeeder) || !feeder.isEnabled() || feeder.getPart() == null) {
+                    continue;
+                }
+                boolean used = jobPlacements.stream().anyMatch(p -> p.getPartId().equals(feeder.getPart().getId()));
+                if (!used) { continue; }
+                try {
+                    ((PnpInventorySlotFeeder) feeder).preflight(job);
+                }
+                catch (Exception e) {
+                    failures.add(feeder.getName() + ": " + e.getMessage());
+                }
+            }
+            if (!failures.isEmpty()) {
+                throw new JobProcessorException(machine, "PnPInventory setup needs attention:\n" + String.join("\n", failures));
+            }
+        }
+
         private void checkSetupErrors() throws JobProcessorException {
             fireTextStatus("Checking job for setup errors.");
 
@@ -1430,7 +1461,12 @@ public class ReferencePnpJobProcessor extends AbstractPnpJobProcessor {
                     fireTextStatus("Feed %s on %s.", feeder.getName(), feeder.getPart().getId());
                     
                     Configuration.get().getScripting().on("Feeder.BeforeFeed", globals);
-                    feeder.feed(nozzle);
+                    if (feeder instanceof PnpInventorySlotFeeder) {
+                        ((PnpInventorySlotFeeder) feeder).feedForJob(nozzle, job);
+                    }
+                    else {
+                        feeder.feed(nozzle);
+                    }
                     Configuration.get().getScripting().on("Feeder.AfterFeed", globals);
                     return;
                 }
